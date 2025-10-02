@@ -1,45 +1,46 @@
-# Budget Tracker
+# Budget Manager
 
-A simple web-based budget tracker that allows you to manage and allocate budget across different categories with smart auto-adjustment features.
+Interactive budget planning tool with dynamic relationships between income and expenses.
 
 ## Features
 
-- **Interactive Budget Categories**:
-  - Budget Total
-  - Staff Costs
-  - Fixed Costs
-  - Other Variable Costs
-  - Scholarships to Participants
+- **Dynamic Budget Balancing**: Automatically balances income and expenses
+- **Lock Functionality**: Lock values to keep them fixed while adjusting others
+- **Dropdown Line Items**: Expand Variable and Fixed Costs to see detailed breakdowns
+- **Real-time Updates**: Changes update immediately across all budget components
 
-- **Smart Sliders**: Adjust budget allocations with intuitive range sliders
-- **Lock/Unlock System**: Lock specific categories to prevent them from auto-adjusting
-- **Auto-adjustment Logic**: When you change one category, others automatically adjust to maintain budget balance
-- **Real-time Summary**: See total allocated budget and remaining funds instantly
-- **Responsive Design**: Works seamlessly on desktop and mobile devices
+## Getting Started
 
-## How to Use
+### Install Dependencies
 
-1. **Start the application**:
-   ```bash
-   python3 -m http.server 8000
-   ```
+```bash
+npm install
+```
 
-2. **Open in browser**: Navigate to `http://localhost:8000`
+### Run Development Server
 
-3. **Adjust Budget**:
-   - Use sliders to change budget allocations
-   - Click lock icons (🔓/🔒) to lock/unlock categories
-   - Locked categories won't change when other sliders are adjusted
-   - Watch the summary update in real-time
+```bash
+npm run dev
+```
 
-## Files
+Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-- `index.html` - Main HTML structure
-- `style.css` - Styling and responsive design
-- `script.js` - JavaScript logic for budget calculations and interactions
+### Build for Production
 
-## Technology
+```bash
+npm run build
+```
 
-- Pure HTML, CSS, and JavaScript (no dependencies)
-- Modern CSS with gradients and animations
-- Responsive design with mobile support
+## Usage
+
+- Adjust sliders to modify budget values
+- Click lock icons to fix specific values
+- Click dropdown arrows on Variable/Fixed Costs to see line items
+- Lock a category total and adjust line items to redistribute within that category
+
+## Tech Stack
+
+- React 18
+- Vite 5
+- Tailwind CSS 3
+- Lucide React (icons)

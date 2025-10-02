@@ -1,52 +1,13 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Budget Tracker</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <div class="container">
-        <h1>Budget Tracker</h1>
-
-        <div class="budget-item">
-            <label for="budget-total">Budget Total: $<span id="budget-total-value">100000</span></label>
-            <input type="range" id="budget-total" min="0" max="500000" value="100000" step="1000">
-            <button class="lock-btn" id="budget-total-lock">🔓</button>
-        </div>
-
-        <div class="budget-item">
-            <label for="staff-costs">Staff Costs: $<span id="staff-costs-value">40000</span></label>
-            <input type="range" id="staff-costs" min="0" max="200000" value="40000" step="1000">
-            <button class="lock-btn" id="staff-costs-lock">🔓</button>
-        </div>
-
-        <div class="budget-item">
-            <label for="fixed-costs">Fixed Costs: $<span id="fixed-costs-value">25000</span></label>
-            <input type="range" id="fixed-costs" min="0" max="150000" value="25000" step="1000">
-            <button class="lock-btn" id="fixed-costs-lock">🔓</button>
-        </div>
-
-        <div class="budget-item">
-            <label for="variable-costs">Other Variable Costs: $<span id="variable-costs-value">20000</span></label>
-            <input type="range" id="variable-costs" min="0" max="150000" value="20000" step="1000">
-            <button class="lock-btn" id="variable-costs-lock">🔓</button>
-        </div>
-
-        <div class="budget-item">
-            <label for="scholarships">Scholarships to Participants: $<span id="scholarships-value">15000</span></label>
-            <input type="range" id="scholarships" min="0" max="100000" value="15000" step="1000">
-            <button class="lock-btn" id="scholarships-lock">🔓</button>
-        </div>
-
-        <div class="summary">
-            <h3>Budget Summary</h3>
-            <p>Total Allocated: $<span id="total-allocated">100000</span></p>
-            <p>Remaining: $<span id="remaining">0</span></p>
-        </div>
-    </div>
-
-    <script src="script.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Budget Manager - Contemplative Semester</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>

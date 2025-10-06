@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp, Lock, Unlock } from 'lucide-react';
 import BudgetItem from './BudgetItem';
+import RentItem from './RentItem';
 import EditableNumber from './EditableNumber';
 
 const OtherExpenses = ({
@@ -24,14 +25,43 @@ const OtherExpenses = ({
     otherOverhead: 10000
   });
 
-  // Sync total from individual items
+  // Sync total from individual items (only when not locked)
   useEffect(() => {
-    const newTotal = Object.values(items).reduce((sum, val) => sum + val, 0);
-    onChange(newTotal);
-  }, [items]);
+    if (!locked) {
+      const newTotal = Object.values(items).reduce((sum, val) => sum + val, 0);
+      onChange(newTotal);
+    }
+  }, [items, locked]);
 
   const handleItemChange = (key, value) => {
-    setItems(prev => ({ ...prev, [key]: value }));
+    if (locked) {
+      // When locked, adjust other unlocked items proportionally
+      const currentSum = Object.values(items).reduce((sum, val) => sum + val, 0);
+      const diff = value - items[key];
+
+      // Get unlocked items (excluding the current one being changed)
+      const unlockedKeys = Object.keys(items).filter(k =>
+        k !== key && !locks?.[k]
+      );
+
+      if (unlockedKeys.length === 0) {
+        // No other items to adjust, just update this one
+        setItems(prev => ({ ...prev, [key]: value }));
+      } else {
+        // Distribute the difference across unlocked items
+        const adjustment = diff / unlockedKeys.length;
+
+        setItems(prev => {
+          const newItems = { ...prev, [key]: value };
+          unlockedKeys.forEach(k => {
+            newItems[k] = Math.max(0, prev[k] - adjustment);
+          });
+          return newItems;
+        });
+      }
+    } else {
+      setItems(prev => ({ ...prev, [key]: value }));
+    }
   };
 
   const percentage = ((total) / 1000000) * 100;
@@ -75,17 +105,14 @@ const OtherExpenses = ({
       {/* Nested items */}
       {expanded && (
         <div className="mt-3 space-y-2 pl-6 border-l-2 border-orange-300">
-          <BudgetItem
-            label="Rent"
-            value={items.rent}
-            min={0}
-            max={100000}
-            step={1000}
+          <RentItem
+            total={items.rent}
             locked={locks?.rent || false}
             onToggleLock={() => onToggleLockItem('rent')}
             onChange={(val) => handleItemChange('rent', val)}
             disabled={disabled}
-            color="orange"
+            locks={locks}
+            onToggleLockItem={onToggleLockItem}
           />
           <BudgetItem
             label="Food"

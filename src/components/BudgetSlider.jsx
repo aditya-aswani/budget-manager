@@ -1,6 +1,6 @@
 import React from 'react';
 import { Lock, Unlock } from 'lucide-react';
-import { formatCurrency } from '../utils/budgetHelpers';
+import EditableNumber from './EditableNumber';
 
 const BudgetSlider = ({
   label,
@@ -54,7 +54,7 @@ const BudgetSlider = ({
     <div className={`mb-4 p-3 ${colors.bg} rounded-lg`}>
       <div className="flex justify-between items-center mb-2">
         <label className="font-medium">
-          {label}: {formatCurrency(value)}
+          {label}: <EditableNumber value={value} onChange={onChange} min={min} max={max} step={step} />
         </label>
         <button
           onClick={onToggleLock}

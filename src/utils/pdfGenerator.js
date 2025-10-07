@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { saveAs } from 'file-saver';
 
 export const generateBudgetPDF = (budgetData) => {
   const { budget, incomeItems, expenseItems, expenseDetails, income, expenses, balance } = budgetData;
@@ -197,44 +198,32 @@ export const generateBudgetPDF = (budgetData) => {
     );
   }
 
-  // Save the PDF using blob method for better browser compatibility
+  // Save the PDF using FileSaver.js with fallback for Brave
+  const filename = `budget-report-${new Date().toISOString().split('T')[0]}.pdf`;
+
+  console.log('Generating PDF blob...');
+  const pdfBlob = doc.output('blob');
+  console.log('Blob size:', pdfBlob.size, 'bytes');
+  console.log('Blob type:', pdfBlob.type);
+  console.log('Filename:', filename);
+  console.log('Attempting to save file...');
+
   try {
-    const filename = `budget-report-${new Date().toISOString().split('T')[0]}.pdf`;
+    saveAs(pdfBlob, filename);
+    console.log('saveAs() called successfully');
 
-    // Get the PDF as a blob
-    const pdfBlob = doc.output('blob');
-
-    // Create a download link
-    const url = URL.createObjectURL(pdfBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    link.style.display = 'none';
-
-    // Append to body and trigger download
-    document.body.appendChild(link);
-
-    // Try to trigger download
-    requestAnimationFrame(() => {
-      link.click();
-    });
-
-    // Fallback: If download doesn't work, open in new tab after 1 second
+    // Fallback: if the file doesn't download after 2 seconds, open in new tab
     setTimeout(() => {
-      window.open(url, '_blank');
-    }, 1000);
-
-    // Clean up after 3 seconds
-    setTimeout(() => {
-      if (document.body.contains(link)) {
-        document.body.removeChild(link);
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      const newTab = window.open(blobUrl, '_blank');
+      if (newTab) {
+        console.log('Opened PDF in new tab as fallback');
+        // Clean up URL after 1 minute
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
       }
-      URL.revokeObjectURL(url);
-    }, 3000);
+    }, 2000);
   } catch (error) {
-    console.error('Error saving PDF:', error);
-    throw error;
+    console.error('Error during saveAs():', error);
+    alert('Error saving PDF: ' + error.message);
   }
 };

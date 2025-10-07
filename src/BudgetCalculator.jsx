@@ -1,18 +1,21 @@
-import { Calculator, Users } from 'lucide-react';
+import { Calculator, Users, FileText } from 'lucide-react';
 import BudgetSlider from './components/BudgetSlider';
 import IncomeSection from './components/sections/IncomeSection';
 import ExpensesSection from './components/sections/ExpensesSection';
 import BudgetSummary from './components/sections/BudgetSummary';
 import { useBudgetState } from './hooks/useBudgetState';
+import { generateBudgetPDF } from './utils/pdfGenerator';
 
 const BudgetCalculator = () => {
   const {
     budget,
     incomeItems,
     expenseItems,
+    expenseDetails,
     locks,
     expanded,
     income,
+    expenses,
     balance,
     isBalanced,
     updateNetTuition,
@@ -24,6 +27,23 @@ const BudgetCalculator = () => {
     toggleExpanded,
     setExpenseItems
   } = useBudgetState();
+
+  const handleGeneratePDF = () => {
+    try {
+      generateBudgetPDF({
+        budget,
+        incomeItems,
+        expenseItems,
+        expenseDetails,
+        income,
+        expenses,
+        balance
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('❌ Error generating PDF: ' + error.message);
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto p-6 bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen">
@@ -110,6 +130,17 @@ const BudgetCalculator = () => {
           <li>• Lock the category total and adjust line items to redistribute within that category</li>
           <li>• The equation automatically balances when you change values</li>
         </ul>
+      </div>
+
+      {/* PDF Export Button */}
+      <div className="mt-6 flex justify-center">
+        <button
+          onClick={handleGeneratePDF}
+          className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 hover:shadow-xl"
+        >
+          <FileText size={24} />
+          <span className="text-lg">Generate PDF Report</span>
+        </button>
       </div>
     </div>
   );

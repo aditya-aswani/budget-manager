@@ -3,9 +3,9 @@ import { useState, useEffect } from 'react';
 export const useBudgetState = () => {
   // Initial state for budget components
   const [budget, setBudget] = useState({
-    total: 300000,
+    total: 366000,
     reserves: 50000,
-    tuition: 150000,
+    tuition: 216000,
     fundraising: 100000,
     variableCosts: 200000,
     fixedCosts: 100000
@@ -14,7 +14,7 @@ export const useBudgetState = () => {
   // State for income line items
   const [incomeItems, setIncomeItems] = useState({
     scholarships: 40000,
-    tuition: 190000
+    tuition: 256000
   });
 
   // State for expense line items
@@ -85,6 +85,31 @@ export const useBudgetState = () => {
     expenses: false,
     tuitionScholarships: false
   });
+
+  // Sync expenseItems from expenseDetails (for PDF generation)
+  useEffect(() => {
+    const staffSalariesTotal = expenseDetails.staffSalaries.beforeSemester +
+                               expenseDetails.staffSalaries.duringSemester;
+
+    const otherExpensesTotal = expenseDetails.otherExpenses.rent +
+                               expenseDetails.otherExpenses.food +
+                               expenseDetails.otherExpenses.legalAccountingInsurance +
+                               expenseDetails.otherExpenses.suppliesSubscriptions +
+                               expenseDetails.otherExpenses.it +
+                               expenseDetails.otherExpenses.travel +
+                               expenseDetails.otherExpenses.otherOverhead;
+
+    setExpenseItems(prev => {
+      if (Math.abs(prev.staffSalaries - staffSalariesTotal) > 0.01 ||
+          Math.abs(prev.otherExpenses - otherExpensesTotal) > 0.01) {
+        return {
+          staffSalaries: staffSalariesTotal,
+          otherExpenses: otherExpensesTotal
+        };
+      }
+      return prev;
+    });
+  }, [expenseDetails]);
 
   // Update budget totals when expense items change
   useEffect(() => {

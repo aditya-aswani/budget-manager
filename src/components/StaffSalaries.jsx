@@ -11,7 +11,9 @@ const StaffSalaries = ({
   onChange,
   disabled,
   locks,
-  onToggleLockItem
+  onToggleLockItem,
+  expenseDetails,
+  setExpenseDetails
 }) => {
   const [expanded, setExpanded] = useState({
     main: false,
@@ -43,6 +45,20 @@ const StaffSalaries = ({
       setDuringSemester(newTotal);
     }
   }, [duringDetails, locks?.duringSemester]);
+
+  // Sync local state back to expenseDetails for PDF generation
+  useEffect(() => {
+    if (setExpenseDetails) {
+      setExpenseDetails(prev => ({
+        ...prev,
+        staffSalaries: {
+          beforeSemester,
+          duringSemester,
+          duringDetails
+        }
+      }));
+    }
+  }, [beforeSemester, duringSemester, duringDetails, setExpenseDetails]);
 
   // Sync parent total when children change (only when not locked)
   useEffect(() => {

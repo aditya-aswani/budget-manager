@@ -11,7 +11,9 @@ const OtherExpenses = ({
   onChange,
   disabled,
   locks,
-  onToggleLockItem
+  onToggleLockItem,
+  expenseDetails,
+  setExpenseDetails
 }) => {
   const [expanded, setExpanded] = useState(false);
   const isUpdatingFromParent = useRef(false);
@@ -41,6 +43,19 @@ const OtherExpenses = ({
       }
     }
   }, [rentDetails, locks?.rent]);
+
+  // Sync local state back to expenseDetails for PDF generation
+  useEffect(() => {
+    if (setExpenseDetails) {
+      setExpenseDetails(prev => ({
+        ...prev,
+        otherExpenses: {
+          ...items,
+          rentDetails
+        }
+      }));
+    }
+  }, [items, rentDetails, setExpenseDetails]);
 
   // Sync total from individual items (only when not locked)
   useEffect(() => {

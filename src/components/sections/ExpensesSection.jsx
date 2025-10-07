@@ -6,10 +6,12 @@ import EditableNumber from '../EditableNumber';
 const ExpensesSection = ({
   budget,
   expenseItems,
+  expenseDetails,
   locks,
   updateExpenseItem,
   toggleLock,
-  setExpenseItems
+  setExpenseItems,
+  setExpenseDetails
 }) => {
   const totalExpenses = budget.variableCosts + budget.fixedCosts;
 
@@ -24,6 +26,8 @@ const ExpensesSection = ({
         onChange={(val) => updateExpenseItem('staffSalaries', val)}
         locks={locks}
         onToggleLockItem={toggleLock}
+        expenseDetails={expenseDetails}
+        setExpenseDetails={setExpenseDetails}
       />
 
       <OtherExpenses
@@ -33,6 +37,8 @@ const ExpensesSection = ({
         onChange={(val) => updateExpenseItem('otherExpenses', val)}
         locks={locks}
         onToggleLockItem={toggleLock}
+        expenseDetails={expenseDetails}
+        setExpenseDetails={setExpenseDetails}
       />
 
       <div className="mt-4 p-3 bg-orange-100 rounded-lg">

@@ -25,7 +25,8 @@ const BudgetCalculator = () => {
     updateBudget,
     toggleLock,
     toggleExpanded,
-    setExpenseItems
+    setExpenseItems,
+    setExpenseDetails
   } = useBudgetState();
 
   const handleGeneratePDF = () => {
@@ -105,10 +106,12 @@ const BudgetCalculator = () => {
         <ExpensesSection
           budget={budget}
           expenseItems={expenseItems}
+          expenseDetails={expenseDetails}
           locks={locks}
           updateExpenseItem={updateExpenseItem}
           toggleLock={toggleLock}
           setExpenseItems={setExpenseItems}
+          setExpenseDetails={setExpenseDetails}
         />
 
         {/* Balance Check */}

@@ -12,8 +12,43 @@ describe('ExpensesSection', () => {
       staffSalaries: 120000,
       otherExpenses: 80000
     },
+    expenseDetails: {
+      staffSalaries: {
+        beforeSemester: 60000,
+        duringSemester: 60000,
+        duringDetails: {
+          leadsOtherRoles: { quantity: 2, rate: 5000 },
+          residentialFaculty: { quantity: 2, rate: 5000 },
+          ras: { quantity: 2, rate: 5000 },
+          retreatTeacher: { quantity: 1, rate: 5000 },
+          daylongVisitingTeacher: { quantity: 1, rate: 5000 },
+          weeklongVisitingTeacher: { quantity: 2, rate: 5000 },
+          headCook: { quantity: 1, rate: 5000 },
+          assistantCook: { quantity: 1, rate: 5000 }
+        }
+      },
+      otherExpenses: {
+        rent: 10000,
+        food: 10000,
+        legalAccountingInsurance: 10000,
+        suppliesSubscriptions: 10000,
+        it: 10000,
+        travel: 10000,
+        otherOverhead: 10000,
+        rentDetails: {
+          csCohort2Program: 3333,
+          alumniProgram: 3333,
+          donorRetreat: 3334
+        }
+      }
+    },
     locks: {},
     updateExpenseItem: vi.fn(),
+    updateOtherExpenseItem: vi.fn(),
+    updateRentDetails: vi.fn(),
+    updateStaffBeforeSemester: vi.fn(),
+    updateStaffDuringSemester: vi.fn(),
+    updateDuringDetail: vi.fn(),
     toggleLock: vi.fn(),
     setExpenseItems: vi.fn()
   };

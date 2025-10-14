@@ -9,6 +9,11 @@ const ExpensesSection = ({
   expenseDetails,
   locks,
   updateExpenseItem,
+  updateOtherExpenseItem,
+  updateRentDetails,
+  updateStaffBeforeSemester,
+  updateStaffDuringSemester,
+  updateDuringDetail,
   toggleLock,
   setExpenseItems,
   setExpenseDetails
@@ -26,8 +31,12 @@ const ExpensesSection = ({
         onChange={(val) => updateExpenseItem('staffSalaries', val)}
         locks={locks}
         onToggleLockItem={toggleLock}
-        expenseDetails={expenseDetails}
-        setExpenseDetails={setExpenseDetails}
+        beforeSemester={expenseDetails.staffSalaries.beforeSemester}
+        duringSemester={expenseDetails.staffSalaries.duringSemester}
+        onBeforeSemesterChange={updateStaffBeforeSemester}
+        onDuringSemesterChange={updateStaffDuringSemester}
+        duringDetails={expenseDetails.staffSalaries.duringDetails}
+        onDuringDetailsChange={updateDuringDetail}
       />
 
       <OtherExpenses
@@ -37,8 +46,10 @@ const ExpensesSection = ({
         onChange={(val) => updateExpenseItem('otherExpenses', val)}
         locks={locks}
         onToggleLockItem={toggleLock}
-        expenseDetails={expenseDetails}
-        setExpenseDetails={setExpenseDetails}
+        items={expenseDetails.otherExpenses}
+        onItemChange={updateOtherExpenseItem}
+        rentDetails={expenseDetails.otherExpenses.rentDetails}
+        onRentDetailsChange={updateRentDetails}
       />
 
       <div className="mt-4 p-3 bg-orange-100 rounded-lg">

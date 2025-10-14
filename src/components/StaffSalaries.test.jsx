@@ -11,7 +11,22 @@ describe('StaffSalaries', () => {
     onChange: vi.fn(),
     disabled: false,
     locks: {},
-    onToggleLockItem: vi.fn()
+    onToggleLockItem: vi.fn(),
+    beforeSemester: 60000,
+    duringSemester: 60000,
+    onBeforeSemesterChange: vi.fn(),
+    onDuringSemesterChange: vi.fn(),
+    duringDetails: {
+      leadsOtherRoles: { quantity: 2, rate: 5000 },
+      residentialFaculty: { quantity: 2, rate: 5000 },
+      ras: { quantity: 2, rate: 5000 },
+      retreatTeacher: { quantity: 1, rate: 5000 },
+      daylongVisitingTeacher: { quantity: 1, rate: 5000 },
+      weeklongVisitingTeacher: { quantity: 2, rate: 5000 },
+      headCook: { quantity: 1, rate: 5000 },
+      assistantCook: { quantity: 1, rate: 5000 }
+    },
+    onDuringDetailsChange: vi.fn()
   };
 
   it('should render staff salaries label and total', () => {

@@ -7,9 +7,9 @@ describe('useBudgetState', () => {
     const { result } = renderHook(() => useBudgetState());
 
     expect(result.current.budget).toBeDefined();
-    expect(result.current.budget.total).toBe(300000);
+    expect(result.current.budget.total).toBe(366000);
     expect(result.current.budget.reserves).toBe(50000);
-    expect(result.current.budget.tuition).toBe(150000);
+    expect(result.current.budget.tuition).toBe(216000);
     expect(result.current.budget.fundraising).toBe(100000);
   });
 
@@ -18,7 +18,7 @@ describe('useBudgetState', () => {
 
     expect(result.current.incomeItems).toBeDefined();
     expect(result.current.incomeItems.scholarships).toBe(40000);
-    expect(result.current.incomeItems.tuition).toBe(190000);
+    expect(result.current.incomeItems.tuition).toBe(256000);
   });
 
   it('should initialize expense items', () => {
@@ -26,7 +26,7 @@ describe('useBudgetState', () => {
 
     expect(result.current.expenseItems).toBeDefined();
     expect(result.current.expenseItems.staffSalaries).toBe(120000);
-    expect(result.current.expenseItems.otherExpenses).toBe(80000);
+    expect(result.current.expenseItems.otherExpenses).toBe(70000);
   });
 
   it('should initialize locks', () => {
@@ -160,7 +160,10 @@ describe('useBudgetState', () => {
       result.current.updateNetTuition(200000);
     });
 
-    expect(result.current.income).toBe(initialIncome + 50000);
+    // Initial: 50000 + 216000 + 100000 = 366000
+    // After: 50000 + 200000 + 100000 = 350000
+    // Difference: -16000
+    expect(result.current.income).toBe(initialIncome - 16000);
   });
 
   it('should recalculate income when fundraising changes', () => {

@@ -22,6 +22,11 @@ const BudgetCalculator = () => {
     updateTuitionItem,
     updateScholarshipsItem,
     updateExpenseItem,
+    updateOtherExpenseItem,
+    updateRentDetails,
+    updateStaffBeforeSemester,
+    updateStaffDuringSemester,
+    updateDuringDetail,
     updateBudget,
     toggleLock,
     toggleExpanded,
@@ -109,6 +114,11 @@ const BudgetCalculator = () => {
           expenseDetails={expenseDetails}
           locks={locks}
           updateExpenseItem={updateExpenseItem}
+          updateOtherExpenseItem={updateOtherExpenseItem}
+          updateRentDetails={updateRentDetails}
+          updateStaffBeforeSemester={updateStaffBeforeSemester}
+          updateStaffDuringSemester={updateStaffDuringSemester}
+          updateDuringDetail={updateDuringDetail}
           toggleLock={toggleLock}
           setExpenseItems={setExpenseItems}
           setExpenseDetails={setExpenseDetails}

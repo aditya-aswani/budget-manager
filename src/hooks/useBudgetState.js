@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   INITIAL_BUDGET,
   INITIAL_INCOME_ITEMS,
@@ -27,21 +27,24 @@ export const useBudgetState = () => {
   const [expenseItems, setExpenseItems] = useState(INITIAL_EXPENSE_ITEMS);
   const [expanded, setExpanded] = useState(INITIAL_EXPANDED);
 
+  // Update source tracking to prevent infinite loops
+  const updateSourceRef = useRef(null);
+
   // Composed hooks
   const { locks, toggleLock } = useLocks();
   const {
     expenseDetails,
     setExpenseDetails,
     syncExpenseItems,
-    updateOtherExpenseItem,
-    updateRentDetails,
-    updateStaffBeforeSemester,
+    updateOtherExpenseItem: updateOtherExpenseItemBase,
+    updateRentDetails: updateRentDetailsBase,
+    updateStaffBeforeSemester: updateStaffBeforeSemesterBase,
     updateStaffDuringSemester: updateStaffDuringSemesterBase,
-    updateDuringDetail,
+    updateDuringDetail: updateDuringDetailBase,
     cascadeOtherExpensesChange,
     cascadeStaffSalariesChange,
     cascadeDuringSemesterChange
-  } = useExpenseDetails();
+  } = useExpenseDetails(expenseItems, locks);
 
   // Sync expenseItems from expenseDetails
   useEffect(() => {
@@ -74,38 +77,188 @@ export const useBudgetState = () => {
 
   // Sync budget.tuition from income sub-items
   useEffect(() => {
-    const netTuition = calculateNetTuition(incomeItems);
-    setBudget(prev => {
-      if (valuesApproximatelyEqual(prev.tuition, netTuition)) {
-        return prev;
-      }
-      return { ...prev, tuition: netTuition };
-    });
+    if (updateSourceRef.current !== 'tuitionCascade') {
+      const netTuition = calculateNetTuition(incomeItems);
+      setBudget(prev => {
+        if (valuesApproximatelyEqual(prev.tuition, netTuition)) {
+          return prev;
+        }
+        return { ...prev, tuition: netTuition };
+      });
+    }
   }, [incomeItems.tuition, incomeItems.scholarships]);
+
+  // Cascade budget.tuition changes to sub-items when it changes (from ANY source)
+  useEffect(() => {
+    const currentNet = calculateNetTuition(incomeItems);
+    const newNet = budget.tuition;
+
+    // Only cascade if net tuition changed and it's not from sub-items updating it
+    if (!valuesApproximatelyEqual(currentNet, newNet) && updateSourceRef.current !== 'tuitionSubItemsUpdated') {
+      const diff = newNet - currentNet;
+
+      // Determine which sub-items to adjust
+      const unlockedSubItems = [];
+      if (!locks.tuitionItem) unlockedSubItems.push('tuition');
+      if (!locks.scholarships) unlockedSubItems.push('scholarships');
+
+      if (unlockedSubItems.length > 0) {
+        setIncomeItems(prev => {
+          const newItems = { ...prev };
+
+          if (unlockedSubItems.length === 2) {
+            // Both unlocked: distribute proportionally
+            const currentTuition = prev.tuition || 0;
+            const currentScholarships = prev.scholarships || 0;
+
+            if (currentTuition + currentScholarships > 0) {
+              const tuitionProportion = currentTuition / (currentTuition + currentScholarships);
+              const scholarshipProportion = 1 - tuitionProportion;
+
+              newItems.tuition = Math.max(0, currentTuition + (diff * tuitionProportion));
+              newItems.scholarships = Math.max(0, currentScholarships - (diff * scholarshipProportion));
+            } else {
+              // Start from scratch: set tuition to net value
+              newItems.tuition = Math.max(0, newNet);
+              newItems.scholarships = 0;
+            }
+          } else if (unlockedSubItems.includes('tuition')) {
+            // Only tuition unlocked: adjust tuition, keep scholarships same
+            newItems.tuition = Math.max(0, newNet + prev.scholarships);
+          } else if (unlockedSubItems.includes('scholarships')) {
+            // Only scholarships unlocked: adjust scholarships inversely
+            newItems.scholarships = Math.max(0, prev.tuition - newNet);
+          }
+
+          updateSourceRef.current = 'tuitionSubItemsUpdated';
+          return newItems;
+        });
+      }
+    }
+
+    // Clear flag after processing
+    if (updateSourceRef.current === 'tuitionSubItemsUpdated') {
+      updateSourceRef.current = null;
+    }
+  }, [budget.tuition, locks.tuitionItem, locks.scholarships, incomeItems.tuition, incomeItems.scholarships]);
 
   // Sync budget.total from income sources (only when total is not locked)
   useEffect(() => {
-    if (!locks.total) {
+    if (!locks.total && updateSourceRef.current !== 'totalBudget') {
       const calculatedTotal = budget.reserves + budget.tuition + budget.fundraising;
       setBudget(prev => {
         if (valuesApproximatelyEqual(prev.total, calculatedTotal)) {
           return prev;
         }
+        updateSourceRef.current = 'incomeToTotal';
         return { ...prev, total: calculatedTotal };
       });
     }
+    // Clear the flag after effect runs
+    if (updateSourceRef.current === 'incomeToTotal') {
+      updateSourceRef.current = null;
+    }
   }, [budget.reserves, budget.tuition, budget.fundraising, locks.total]);
+
+  // Cascade total budget changes to unlocked income sources
+  useEffect(() => {
+    if (updateSourceRef.current === 'totalBudgetChanged') {
+      const currentIncome = budget.reserves + budget.tuition + budget.fundraising;
+      const diff = budget.total - currentIncome;
+
+      if (!valuesApproximatelyEqual(diff, 0)) {
+        const incomeComponents = ['reserves', 'tuition', 'fundraising'];
+        const unlockedComponents = incomeComponents.filter(c => !locks[c]);
+
+        if (unlockedComponents.length > 0) {
+          // Calculate proportional distribution based on current values
+          const unlockedTotal = unlockedComponents.reduce((sum, c) => sum + budget[c], 0);
+
+          setBudget(prev => {
+            const newBudget = { ...prev };
+
+            if (unlockedTotal > 0) {
+              // Distribute proportionally to current values
+              unlockedComponents.forEach(c => {
+                const proportion = prev[c] / unlockedTotal;
+                newBudget[c] = Math.max(0, prev[c] + (diff * proportion));
+              });
+            } else {
+              // Equal distribution if all unlocked are zero
+              const adjustment = diff / unlockedComponents.length;
+              unlockedComponents.forEach(c => {
+                newBudget[c] = Math.max(0, adjustment);
+              });
+            }
+
+            updateSourceRef.current = 'totalBudget';
+            return newBudget;
+          });
+        }
+      }
+
+      // Clear flag after cascade
+      if (updateSourceRef.current === 'totalBudget') {
+        updateSourceRef.current = null;
+      }
+    }
+  }, [budget.total, locks.reserves, locks.tuition, locks.fundraising]);
 
   // Income update handlers
   const updateNetTuition = (netValue) => {
     if (locks.total) {
       return handleLockedTotalChange('tuition', netValue);
     }
+
+    const currentNet = budget.tuition;
+    const diff = netValue - currentNet;
+
+    // Update budget.tuition
     setBudget(prev => ({ ...prev, tuition: netValue }));
-    setIncomeItems(prev => ({
-      ...prev,
-      tuition: netValue + prev.scholarships
-    }));
+
+    // Cascade to sub-items if unlocked
+    const unlockedSubItems = [];
+    if (!locks.tuitionItem) unlockedSubItems.push('tuition');
+    if (!locks.scholarships) unlockedSubItems.push('scholarships');
+
+    if (unlockedSubItems.length > 0 && Math.abs(diff) > 0.01) {
+      setIncomeItems(prev => {
+        const newItems = { ...prev };
+
+        if (unlockedSubItems.length === 2) {
+          // Both unlocked: distribute proportionally
+          const currentTuition = prev.tuition || 0;
+          const currentScholarships = prev.scholarships || 0;
+          const subItemsTotal = currentTuition - currentScholarships;
+
+          if (subItemsTotal > 0) {
+            const tuitionProportion = currentTuition / (currentTuition + currentScholarships);
+            newItems.tuition = Math.max(0, currentTuition + (diff * tuitionProportion));
+            // Scholarships decreases when net increases (inverse relationship)
+            newItems.scholarships = Math.max(0, newItems.tuition - netValue);
+          } else {
+            // Start from scratch: set tuition to net value
+            newItems.tuition = Math.max(0, netValue);
+            newItems.scholarships = 0;
+          }
+        } else if (unlockedSubItems.includes('tuition')) {
+          // Only tuition unlocked: adjust tuition, keep scholarships same
+          newItems.tuition = Math.max(0, netValue + prev.scholarships);
+        } else if (unlockedSubItems.includes('scholarships')) {
+          // Only scholarships unlocked: adjust scholarships inversely
+          const currentScholarships = prev.scholarships || 0;
+          newItems.scholarships = Math.max(0, currentScholarships - diff);
+        }
+
+        return newItems;
+      });
+    } else {
+      // All locked: just maintain the relationship
+      setIncomeItems(prev => ({
+        ...prev,
+        tuition: netValue + prev.scholarships
+      }));
+    }
   };
 
   const updateTuitionItem = (value) => {
@@ -234,7 +387,11 @@ export const useBudgetState = () => {
 
   // Budget component update
   const updateBudget = (component, value) => {
-    if (component === 'reserves' || component === 'tuition' || component === 'fundraising') {
+    if (component === 'total') {
+      // Mark that this is a manual total budget change
+      updateSourceRef.current = 'totalBudgetChanged';
+      setBudget(prev => ({ ...prev, total: value }));
+    } else if (component === 'reserves' || component === 'tuition' || component === 'fundraising') {
       if (locks.total) {
         return handleLockedTotalChange(component, value);
       }
@@ -244,39 +401,25 @@ export const useBudgetState = () => {
     }
   };
 
-  // Wrapper for updateStaffDuringSemester with cascade logic
+  // Wrapper functions that pass locks to base functions
+  const updateOtherExpenseItem = (itemKey, value) => {
+    updateOtherExpenseItemBase(itemKey, value, locks);
+  };
+
+  const updateRentDetails = (rentKey, value) => {
+    updateRentDetailsBase(rentKey, value, locks);
+  };
+
+  const updateStaffBeforeSemester = (value) => {
+    updateStaffBeforeSemesterBase(value, locks);
+  };
+
   const updateStaffDuringSemester = (value) => {
-    // First, try to cascade the change to sub-items
-    cascadeDuringSemesterChange(value, locks);
+    updateStaffDuringSemesterBase(value, locks);
+  };
 
-    // Also need to adjust Staff Salaries total and potentially Before Semester
-    const currentStaffTotal = expenseDetails.staffSalaries.beforeSemester + expenseDetails.staffSalaries.duringSemester;
-    const newStaffTotal = expenseDetails.staffSalaries.beforeSemester + value;
-
-    // Check if we need to adjust Before Semester to maintain Staff Salaries total
-    if (!locks.staffSalaries && locks.beforeSemester && !locks.duringSemester) {
-      // Staff Salaries can change freely
-      return;
-    }
-
-    if (locks.staffSalaries && !locks.beforeSemester) {
-      // Need to adjust Before Semester to maintain Staff Salaries total
-      const diff = value - expenseDetails.staffSalaries.duringSemester;
-      const newBeforeSemester = expenseDetails.staffSalaries.beforeSemester - diff;
-
-      if (newBeforeSemester < 0) {
-        alert(
-          '⚠️ Cannot adjust During Semester\n\n' +
-          'Staff Salaries is locked and Before Semester cannot go negative.\n\n' +
-          'To change During Semester:\n' +
-          '1. Unlock Staff Salaries, OR\n' +
-          '2. Reduce During Semester instead of increasing it'
-        );
-        return;
-      }
-
-      updateStaffBeforeSemester(newBeforeSemester);
-    }
+  const updateDuringDetail = (role, detail) => {
+    updateDuringDetailBase(role, detail, locks);
   };
 
   // Expanded state

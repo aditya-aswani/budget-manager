@@ -69,7 +69,19 @@ export const INITIAL_LOCKS = {
   daylongVisitingTeacher: false,
   weeklongVisitingTeacher: false,
   headCook: false,
-  assistantCook: false
+  assistantCook: false,
+  // Other Expenses sub-items
+  rent: false,
+  food: false,
+  legalAccountingInsurance: false,
+  suppliesSubscriptions: false,
+  it: false,
+  travel: false,
+  otherOverhead: false,
+  // Rent sub-items
+  csCohort2Program: false,
+  alumniProgram: false,
+  donorRetreat: false
 };
 
 export const INITIAL_EXPANDED = {

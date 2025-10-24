@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { INITIAL_EXPENSE_DETAILS } from '../config/initialBudget';
 import {
   calculateStaffSalariesTotal,
@@ -9,8 +9,11 @@ import {
 } from '../utils/budgetCalculators';
 import { redistributeProportionally } from '../utils/redistributors';
 
-export const useExpenseDetails = (expenseItems) => {
+export const useExpenseDetails = (expenseItems, locks = {}) => {
   const [expenseDetails, setExpenseDetails] = useState(INITIAL_EXPENSE_DETAILS);
+
+  // Update source tracking to prevent infinite loops
+  const updateSourceRef = useRef(null);
 
   // Sync expenseItems from expenseDetails (for consistency)
   const syncExpenseItems = () => {
@@ -24,52 +27,319 @@ export const useExpenseDetails = (expenseItems) => {
   };
 
   // Update handlers
-  const updateOtherExpenseItem = (itemKey, value) => {
-    setExpenseDetails(prev => ({
-      ...prev,
-      otherExpenses: {
-        ...prev.otherExpenses,
-        [itemKey]: value
+  const updateOtherExpenseItem = (itemKey, value, locks = {}) => {
+    const currentValue = expenseDetails.otherExpenses[itemKey];
+    const diff = value - currentValue;
+
+    // If Other Expenses is locked, adjust other unlocked sub-items inversely
+    if (locks.otherExpenses) {
+      const allKeys = Object.keys(expenseDetails.otherExpenses).filter(k => k !== 'rentDetails');
+      const unlockedKeys = allKeys.filter(k => k !== itemKey && !locks[k]);
+
+      if (unlockedKeys.length === 0) {
+        alert(
+          '⚠️ Cannot change ' + itemKey + ' when Other Expenses is locked and all other items are locked.\n\n' +
+          'To make this change:\n' +
+          '1. Unlock Other Expenses, OR\n' +
+          '2. Unlock another expense item to allow redistribution'
+        );
+        return;
       }
-    }));
+
+      // Check if redistribution is possible
+      const unlockedTotal = unlockedKeys.reduce((sum, k) => sum + expenseDetails.otherExpenses[k], 0);
+
+      setExpenseDetails(prev => {
+        const newExpenses = { ...prev.otherExpenses, [itemKey]: value };
+
+        // Redistribute inversely among unlocked items
+        unlockedKeys.forEach(k => {
+          const proportion = unlockedTotal > 0 ? prev.otherExpenses[k] / unlockedTotal : 1 / unlockedKeys.length;
+          const adjustment = diff * proportion;
+          newExpenses[k] = Math.max(0, prev.otherExpenses[k] - adjustment);
+        });
+
+        return {
+          ...prev,
+          otherExpenses: newExpenses
+        };
+      });
+    } else {
+      setExpenseDetails(prev => ({
+        ...prev,
+        otherExpenses: {
+          ...prev.otherExpenses,
+          [itemKey]: value
+        }
+      }));
+    }
   };
 
-  const updateRentDetails = (newRentDetails) => {
-    setExpenseDetails(prev => ({
-      ...prev,
-      otherExpenses: {
-        ...prev.otherExpenses,
-        rentDetails: newRentDetails
+  const updateRentDetails = (rentKey, value, locks = {}) => {
+    const currentValue = expenseDetails.otherExpenses.rentDetails[rentKey];
+    const diff = value - currentValue;
+
+    // If Rent is locked, adjust other unlocked rent sub-items inversely
+    if (locks.rent) {
+      const allKeys = Object.keys(expenseDetails.otherExpenses.rentDetails);
+      const unlockedKeys = allKeys.filter(k => k !== rentKey && !locks[k]);
+
+      if (unlockedKeys.length === 0) {
+        alert(
+          '⚠️ Cannot change ' + rentKey + ' when Rent is locked and all other rent items are locked.\n\n' +
+          'To make this change:\n' +
+          '1. Unlock Rent, OR\n' +
+          '2. Unlock another rent item to allow redistribution'
+        );
+        return;
       }
-    }));
+
+      const unlockedTotal = unlockedKeys.reduce((sum, k) => sum + expenseDetails.otherExpenses.rentDetails[k], 0);
+
+      setExpenseDetails(prev => {
+        const newRentDetails = { ...prev.otherExpenses.rentDetails, [rentKey]: value };
+
+        // Redistribute inversely among unlocked rent items
+        unlockedKeys.forEach(k => {
+          const proportion = unlockedTotal > 0 ? prev.otherExpenses.rentDetails[k] / unlockedTotal : 1 / unlockedKeys.length;
+          const adjustment = diff * proportion;
+          newRentDetails[k] = Math.max(0, prev.otherExpenses.rentDetails[k] - adjustment);
+        });
+
+        // Recalculate rent total (should stay the same since locked)
+        const newRentTotal = calculateRentTotal(newRentDetails);
+
+        return {
+          ...prev,
+          otherExpenses: {
+            ...prev.otherExpenses,
+            rent: newRentTotal,
+            rentDetails: newRentDetails
+          }
+        };
+      });
+    } else {
+      // Rent is unlocked - update sub-item and recalculate rent total
+      setExpenseDetails(prev => {
+        const newRentDetails = {
+          ...prev.otherExpenses.rentDetails,
+          [rentKey]: value
+        };
+        const newRentTotal = calculateRentTotal(newRentDetails);
+
+        return {
+          ...prev,
+          otherExpenses: {
+            ...prev.otherExpenses,
+            rent: newRentTotal,
+            rentDetails: newRentDetails
+          }
+        };
+      });
+    }
   };
 
-  const updateStaffBeforeSemester = (value) => {
-    setExpenseDetails(prev => ({
-      ...prev,
-      staffSalaries: {
-        ...prev.staffSalaries,
-        beforeSemester: value
+  const updateStaffBeforeSemester = (value, locks = {}) => {
+    // Check if we can make this change
+    if (locks.staffSalaries && locks.duringSemester) {
+      alert(
+        '⚠️ Cannot change Before Semester when both Staff Salaries and During Semester are locked.\n\n' +
+        'To change Before Semester:\n' +
+        '1. Unlock Staff Salaries, OR\n' +
+        '2. Unlock During Semester'
+      );
+      return;
+    }
+
+    const currentBefore = expenseDetails.staffSalaries.beforeSemester;
+    const diff = value - currentBefore;
+
+    // If Staff Salaries is locked, adjust During Semester inversely
+    if (locks.staffSalaries && !locks.duringSemester) {
+      const newDuring = expenseDetails.staffSalaries.duringSemester - diff;
+
+      if (newDuring < 0) {
+        alert(
+          '⚠️ Cannot adjust Before Semester\n\n' +
+          'Staff Salaries is locked and During Semester cannot go negative.\n\n' +
+          'To change Before Semester:\n' +
+          '1. Unlock Staff Salaries, OR\n' +
+          '2. Reduce Before Semester instead of increasing it'
+        );
+        return;
       }
-    }));
+
+      // Mark that During Semester is changing (so it cascades to sub-items)
+      updateSourceRef.current = 'duringSemesterChanged';
+
+      setExpenseDetails(prev => ({
+        ...prev,
+        staffSalaries: {
+          ...prev.staffSalaries,
+          beforeSemester: value,
+          duringSemester: newDuring
+        }
+      }));
+    } else {
+      setExpenseDetails(prev => ({
+        ...prev,
+        staffSalaries: {
+          ...prev.staffSalaries,
+          beforeSemester: value
+        }
+      }));
+    }
   };
 
-  const updateStaffDuringSemester = (value) => {
-    setExpenseDetails(prev => ({
-      ...prev,
-      staffSalaries: {
-        ...prev.staffSalaries,
-        duringSemester: value
+  const updateStaffDuringSemester = (value, locks = {}) => {
+    // Check if we can make this change
+    if (locks.staffSalaries && locks.beforeSemester) {
+      alert(
+        '⚠️ Cannot change During Semester when both Staff Salaries and Before Semester are locked.\n\n' +
+        'To change During Semester:\n' +
+        '1. Unlock Staff Salaries, OR\n' +
+        '2. Unlock Before Semester'
+      );
+      return;
+    }
+
+    const currentDuring = expenseDetails.staffSalaries.duringSemester;
+    const diff = value - currentDuring;
+
+    // Mark update source
+    updateSourceRef.current = 'duringSemesterChanged';
+
+    // If Staff Salaries is locked, adjust Before Semester inversely
+    if (locks.staffSalaries && !locks.beforeSemester) {
+      const newBefore = expenseDetails.staffSalaries.beforeSemester - diff;
+
+      if (newBefore < 0) {
+        alert(
+          '⚠️ Cannot adjust During Semester\n\n' +
+          'Staff Salaries is locked and Before Semester cannot go negative.\n\n' +
+          'To change During Semester:\n' +
+          '1. Unlock Staff Salaries, OR\n' +
+          '2. Reduce During Semester instead of increasing it'
+        );
+        return;
       }
-    }));
+
+      setExpenseDetails(prev => ({
+        ...prev,
+        staffSalaries: {
+          ...prev.staffSalaries,
+          beforeSemester: newBefore,
+          duringSemester: value
+        }
+      }));
+    } else {
+      setExpenseDetails(prev => ({
+        ...prev,
+        staffSalaries: {
+          ...prev.staffSalaries,
+          duringSemester: value
+        }
+      }));
+    }
   };
 
-  const updateDuringDetail = (role, detail) => {
+  const updateDuringDetail = (role, detail, locks = {}) => {
+    const currentRoleTotal = expenseDetails.staffSalaries.duringDetails[role].quantity * expenseDetails.staffSalaries.duringDetails[role].rate;
+    const newRoleTotal = detail.quantity * detail.rate;
+    const diff = newRoleTotal - currentRoleTotal;
+
+    // If both Staff Salaries and Before Semester are locked, we need to redistribute among other During Semester sub-items
+    if (locks.staffSalaries && locks.beforeSemester) {
+      // Must redistribute among other unlocked During Semester sub-items
+      const allRoles = Object.keys(expenseDetails.staffSalaries.duringDetails);
+      const unlockedRoles = allRoles.filter(r => r !== role && !locks[r]);
+
+      if (unlockedRoles.length === 0) {
+        alert(
+          '⚠️ Cannot change ' + role + ' when Staff Salaries and Before Semester are locked and all other During Semester items are locked.\n\n' +
+          'To make this change:\n' +
+          '1. Unlock Staff Salaries, OR\n' +
+          '2. Unlock Before Semester, OR\n' +
+          '3. Unlock another During Semester item to allow redistribution'
+        );
+        return;
+      }
+
+      // Redistribute inversely among unlocked roles
+      setExpenseDetails(prev => {
+        const newDetails = { ...prev.staffSalaries.duringDetails, [role]: detail };
+
+        const unlockedTotal = unlockedRoles.reduce((sum, r) => {
+          return sum + (prev.staffSalaries.duringDetails[r].quantity * prev.staffSalaries.duringDetails[r].rate);
+        }, 0);
+
+        unlockedRoles.forEach(r => {
+          const roleTotal = prev.staffSalaries.duringDetails[r].quantity * prev.staffSalaries.duringDetails[r].rate;
+          const proportion = unlockedTotal > 0 ? roleTotal / unlockedTotal : 1 / unlockedRoles.length;
+          const adjustment = diff * proportion;
+          const newTotal = Math.max(0, roleTotal - adjustment);
+          const rate = prev.staffSalaries.duringDetails[r].rate;
+
+          newDetails[r] = {
+            ...prev.staffSalaries.duringDetails[r],
+            quantity: rate > 0 ? Math.max(0, Number((newTotal / rate).toFixed(2))) : 0
+          };
+        });
+
+        // Recalculate duringSemester total (should stay approximately the same)
+        const newDuringSemesterTotal = Object.values(newDetails).reduce(
+          (sum, item) => sum + (item.quantity * item.rate),
+          0
+        );
+
+        return {
+          ...prev,
+          staffSalaries: {
+            ...prev.staffSalaries,
+            duringDetails: newDetails,
+            duringSemester: newDuringSemesterTotal
+          }
+        };
+      });
+      return;
+    }
+
     setExpenseDetails(prev => {
-      const newDetails = {
+      const currentRoleTotal = prev.staffSalaries.duringDetails[role].quantity * prev.staffSalaries.duringDetails[role].rate;
+      const newRoleTotal = detail.quantity * detail.rate;
+      const diff = newRoleTotal - currentRoleTotal;
+
+      let newDetails = {
         ...prev.staffSalaries.duringDetails,
         [role]: detail
       };
+
+      // If During Semester is locked, redistribute among other unlocked sub-items
+      if (locks.duringSemester) {
+        const allRoles = Object.keys(prev.staffSalaries.duringDetails);
+        const unlockedRoles = allRoles.filter(r => r !== role && !locks[r]);
+
+        if (unlockedRoles.length > 0) {
+          // Calculate current totals for unlocked roles
+          const unlockedTotal = unlockedRoles.reduce((sum, r) => {
+            return sum + (prev.staffSalaries.duringDetails[r].quantity * prev.staffSalaries.duringDetails[r].rate);
+          }, 0);
+
+          // Redistribute the diff inversely among unlocked roles
+          unlockedRoles.forEach(r => {
+            const roleTotal = prev.staffSalaries.duringDetails[r].quantity * prev.staffSalaries.duringDetails[r].rate;
+            const proportion = unlockedTotal > 0 ? roleTotal / unlockedTotal : 1 / unlockedRoles.length;
+            const adjustment = diff * proportion;
+            const newTotal = Math.max(0, roleTotal - adjustment);
+            const rate = prev.staffSalaries.duringDetails[r].rate;
+
+            newDetails[r] = {
+              ...prev.staffSalaries.duringDetails[r],
+              quantity: rate > 0 ? Math.max(0, Number((newTotal / rate).toFixed(2))) : 0
+            };
+          });
+        }
+      }
 
       // Recalculate duringSemester total from sub-items
       const newDuringSemesterTotal = Object.values(newDetails).reduce(
@@ -77,12 +347,21 @@ export const useExpenseDetails = (expenseItems) => {
         0
       );
 
+      // If Staff Salaries is locked but During Semester changed, adjust Before Semester
+      const duringSemesterDiff = newDuringSemesterTotal - prev.staffSalaries.duringSemester;
+      let newBeforeSemester = prev.staffSalaries.beforeSemester;
+
+      if (locks.staffSalaries && !locks.beforeSemester && Math.abs(duringSemesterDiff) > 0.01) {
+        newBeforeSemester = Math.max(0, prev.staffSalaries.beforeSemester - duringSemesterDiff);
+      }
+
       return {
         ...prev,
         staffSalaries: {
           ...prev.staffSalaries,
           duringDetails: newDetails,
-          duringSemester: newDuringSemesterTotal
+          duringSemester: newDuringSemesterTotal,
+          beforeSemester: newBeforeSemester
         }
       };
     });
@@ -90,6 +369,22 @@ export const useExpenseDetails = (expenseItems) => {
 
   // Cascade handlers - redistribute sub-items when main slider moves
   const cascadeOtherExpensesChange = (newTotal, locks = {}) => {
+    // Check which items are unlocked
+    const allKeys = Object.keys(expenseDetails.otherExpenses).filter(k => k !== 'rentDetails');
+    const unlockedKeys = allKeys.filter(k => !locks[k]);
+
+    if (unlockedKeys.length === 0) {
+      alert(
+        '⚠️ Cannot change Other Expenses when all sub-items are locked.\n\n' +
+        'To change Other Expenses:\n' +
+        'Unlock at least one sub-item (Rent, Food, etc.)'
+      );
+      return;
+    }
+
+    // Mark that this is an Other Expenses change
+    updateSourceRef.current = 'otherExpensesChanged';
+
     setExpenseDetails(prev => {
       const currentTotal = calculateOtherExpensesTotal(prev);
 
@@ -100,16 +395,7 @@ export const useExpenseDetails = (expenseItems) => {
       const diff = newTotal - currentTotal;
       const otherExpenses = prev.otherExpenses;
 
-      // Get all sub-item keys (excluding rentDetails which is nested)
-      const subItemKeys = Object.keys(otherExpenses).filter(k => k !== 'rentDetails');
-      const unlockedKeys = subItemKeys.filter(k => !locks[k]);
-
-      if (unlockedKeys.length === 0) {
-        return prev; // Can't redistribute if all items are locked
-      }
-
       // Redistribute proportionally among unlocked items
-      const currentSubTotal = subItemKeys.reduce((sum, k) => sum + otherExpenses[k], 0);
       const redistributed = redistributeProportionally(otherExpenses, unlockedKeys, diff);
 
       return {
@@ -120,6 +406,24 @@ export const useExpenseDetails = (expenseItems) => {
   };
 
   const cascadeStaffSalariesChange = (newTotal, locks = {}) => {
+    // Check which items are unlocked
+    const unlockedItems = [];
+    if (!locks.beforeSemester) unlockedItems.push('beforeSemester');
+    if (!locks.duringSemester) unlockedItems.push('duringSemester');
+
+    if (unlockedItems.length === 0) {
+      alert(
+        '⚠️ Cannot change Staff Salaries when both Before Semester and During Semester are locked.\n\n' +
+        'To change Staff Salaries:\n' +
+        '1. Unlock Before Semester, OR\n' +
+        '2. Unlock During Semester'
+      );
+      return;
+    }
+
+    // Mark that this is a Staff Salaries change
+    updateSourceRef.current = 'staffSalariesChanged';
+
     setExpenseDetails(prev => {
       const currentTotal = calculateStaffSalariesTotal(prev);
 
@@ -130,16 +434,7 @@ export const useExpenseDetails = (expenseItems) => {
       const diff = newTotal - currentTotal;
       const staffSalaries = prev.staffSalaries;
 
-      // Check if beforeSemester and duringSemester are locked
-      const unlockedItems = [];
-      if (!locks.beforeSemester) unlockedItems.push('beforeSemester');
-      if (!locks.duringSemester) unlockedItems.push('duringSemester');
-
-      if (unlockedItems.length === 0) {
-        return prev; // Can't redistribute if both are locked
-      }
-
-      // Redistribute proportionally
+      // Redistribute proportionally among unlocked items
       const items = {
         beforeSemester: staffSalaries.beforeSemester,
         duringSemester: staffSalaries.duringSemester
@@ -190,14 +485,14 @@ export const useExpenseDetails = (expenseItems) => {
       // Redistribute proportionally among unlocked roles
       const redistributedTotals = redistributeProportionally(roleTotals, unlockedRoles, diff);
 
-      // Convert back to quantity/rate
+      // Convert back to quantity/rate (allow decimals, round to 2 places)
       const newDetails = { ...duringDetails };
       unlockedRoles.forEach(role => {
         const newTotal = redistributedTotals[role];
         const rate = duringDetails[role].rate;
         newDetails[role] = {
           ...duringDetails[role],
-          quantity: rate > 0 ? Math.round(newTotal / rate) : 0
+          quantity: rate > 0 ? Math.max(0, Number((newTotal / rate).toFixed(2))) : 0
         };
       });
 
@@ -211,6 +506,125 @@ export const useExpenseDetails = (expenseItems) => {
       };
     });
   };
+
+  // Effect: Cascade During Semester changes to sub-items when it changes
+  useEffect(() => {
+    // Only cascade when During Semester changes from Staff Salaries or manual change
+    if (updateSourceRef.current === 'staffSalariesChanged' || updateSourceRef.current === 'duringSemesterChanged') {
+      const currentDuring = expenseDetails.staffSalaries.duringSemester;
+      const currentSubItemsTotal = calculateDuringSemesterTotal(expenseDetails.staffSalaries.duringDetails);
+
+      if (!valuesApproximatelyEqual(currentDuring, currentSubItemsTotal)) {
+        const diff = currentDuring - currentSubItemsTotal;
+        const duringDetails = expenseDetails.staffSalaries.duringDetails;
+        const allRoles = Object.keys(duringDetails);
+
+        // Only redistribute to unlocked roles
+        const unlockedRoles = allRoles.filter(role => !locks[role]);
+
+        if (unlockedRoles.length > 0) {
+          const roleTotals = {};
+          allRoles.forEach(role => {
+            roleTotals[role] = duringDetails[role].quantity * duringDetails[role].rate;
+          });
+
+          const redistributedTotals = redistributeProportionally(roleTotals, unlockedRoles, diff);
+
+          const newDetails = { ...duringDetails };
+          unlockedRoles.forEach(role => {
+            const newTotal = redistributedTotals[role];
+            const rate = duringDetails[role].rate;
+            newDetails[role] = {
+              ...duringDetails[role],
+              quantity: rate > 0 ? Math.max(0, Number((newTotal / rate).toFixed(2))) : 0
+            };
+          });
+
+          setExpenseDetails(prev => ({
+            ...prev,
+            staffSalaries: {
+              ...prev.staffSalaries,
+              duringDetails: newDetails
+            }
+          }));
+        }
+      }
+
+      // Clear the flag
+      updateSourceRef.current = null;
+    }
+  }, [expenseDetails.staffSalaries.duringSemester, locks]);
+
+  // Effect: Cascade Other Expenses changes to sub-items when it changes
+  useEffect(() => {
+    if (updateSourceRef.current === 'otherExpensesChanged') {
+      const currentOtherExpenses = calculateOtherExpensesTotal(expenseDetails);
+      const targetOtherExpenses = expenseItems?.otherExpenses;
+
+      if (targetOtherExpenses && !valuesApproximatelyEqual(currentOtherExpenses, targetOtherExpenses)) {
+        const diff = targetOtherExpenses - currentOtherExpenses;
+        const allKeys = Object.keys(expenseDetails.otherExpenses).filter(k => k !== 'rentDetails');
+        const unlockedKeys = allKeys.filter(k => !locks[k]);
+
+        if (unlockedKeys.length > 0) {
+          const currentValues = {};
+          allKeys.forEach(k => {
+            currentValues[k] = expenseDetails.otherExpenses[k];
+          });
+
+          const redistributed = redistributeProportionally(currentValues, unlockedKeys, diff);
+
+          setExpenseDetails(prev => ({
+            ...prev,
+            otherExpenses: {
+              ...prev.otherExpenses,
+              ...redistributed
+            }
+          }));
+        }
+      }
+
+      updateSourceRef.current = null;
+    }
+  }, [expenseItems?.otherExpenses, locks, expenseDetails]);
+
+  // Effect: Cascade Rent changes to rent sub-items when it changes (from ANY source)
+  useEffect(() => {
+    const currentRent = calculateRentTotal(expenseDetails.otherExpenses.rentDetails);
+    const targetRent = expenseDetails.otherExpenses.rent;
+
+    // Only cascade if Rent changed and it's not from sub-items updating Rent
+    if (!valuesApproximatelyEqual(currentRent, targetRent) && updateSourceRef.current !== 'rentSubItemsUpdated') {
+      const diff = targetRent - currentRent;
+      const allKeys = Object.keys(expenseDetails.otherExpenses.rentDetails);
+      const unlockedKeys = allKeys.filter(k => !locks[k]);
+
+      if (unlockedKeys.length > 0) {
+        const currentValues = {};
+        allKeys.forEach(k => {
+          currentValues[k] = expenseDetails.otherExpenses.rentDetails[k];
+        });
+
+        const redistributed = redistributeProportionally(currentValues, unlockedKeys, diff);
+
+        // Mark that we're updating from Rent → sub-items
+        updateSourceRef.current = 'rentSubItemsUpdated';
+
+        setExpenseDetails(prev => ({
+          ...prev,
+          otherExpenses: {
+            ...prev.otherExpenses,
+            rentDetails: redistributed
+          }
+        }));
+      }
+    }
+
+    // Clear flag after processing
+    if (updateSourceRef.current === 'rentSubItemsUpdated') {
+      updateSourceRef.current = null;
+    }
+  }, [expenseDetails.otherExpenses.rent, locks]);
 
   return {
     expenseDetails,

@@ -1,6 +1,9 @@
-// Format number with commas
+// Format number with commas and up to 2 decimal places
 export const formatNumber = (num) => {
-  return new Intl.NumberFormat('en-US').format(Math.round(num));
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  }).format(num);
 };
 
 // Parse number from formatted string

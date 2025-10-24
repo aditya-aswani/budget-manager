@@ -248,24 +248,22 @@ export const useExpenseDetails = (expenseItems, locks = {}) => {
     const newRoleTotal = detail.quantity * detail.rate;
     const diff = newRoleTotal - currentRoleTotal;
 
-    // If both Staff Salaries and Before Semester are locked, we need to redistribute among other During Semester sub-items
-    if (locks.staffSalaries && locks.beforeSemester) {
-      // Must redistribute among other unlocked During Semester sub-items
-      const allRoles = Object.keys(expenseDetails.staffSalaries.duringDetails);
-      const unlockedRoles = allRoles.filter(r => r !== role && !locks[r]);
+    // Get all roles and unlocked roles for redistribution
+    const allRoles = Object.keys(expenseDetails.staffSalaries.duringDetails);
+    const unlockedRoles = allRoles.filter(r => r !== role && !locks[r]);
 
-      if (unlockedRoles.length === 0) {
-        alert(
-          '⚠️ Cannot change ' + role + ' when Staff Salaries and Before Semester are locked and all other During Semester items are locked.\n\n' +
-          'To make this change:\n' +
-          '1. Unlock Staff Salaries, OR\n' +
-          '2. Unlock Before Semester, OR\n' +
-          '3. Unlock another During Semester item to allow redistribution'
-        );
-        return;
-      }
+    if (unlockedRoles.length === 0) {
+      alert(
+        '⚠️ Cannot change ' + role + ' when all other During Semester items are locked.\n\n' +
+        'To make this change:\n' +
+        'Unlock at least one other During Semester item to allow redistribution'
+      );
+      return;
+    }
 
-      // Redistribute inversely among unlocked roles
+    // If During Semester is locked, we MUST maintain its exact value
+    if (locks.duringSemester) {
+      // Redistribute inversely among unlocked roles to maintain locked During Semester total
       setExpenseDetails(prev => {
         const newDetails = { ...prev.staffSalaries.duringDetails, [role]: detail };
 
@@ -286,60 +284,25 @@ export const useExpenseDetails = (expenseItems, locks = {}) => {
           };
         });
 
-        // Recalculate duringSemester total (should stay approximately the same)
-        const newDuringSemesterTotal = Object.values(newDetails).reduce(
-          (sum, item) => sum + (item.quantity * item.rate),
-          0
-        );
-
+        // During Semester stays locked at its current value
         return {
           ...prev,
           staffSalaries: {
             ...prev.staffSalaries,
-            duringDetails: newDetails,
-            duringSemester: newDuringSemesterTotal
+            duringDetails: newDetails
+            // DON'T update duringSemester - it's locked!
           }
         };
       });
       return;
     }
 
+    // During Semester is unlocked - update normally
     setExpenseDetails(prev => {
-      const currentRoleTotal = prev.staffSalaries.duringDetails[role].quantity * prev.staffSalaries.duringDetails[role].rate;
-      const newRoleTotal = detail.quantity * detail.rate;
-      const diff = newRoleTotal - currentRoleTotal;
-
-      let newDetails = {
+      const newDetails = {
         ...prev.staffSalaries.duringDetails,
         [role]: detail
       };
-
-      // If During Semester is locked, redistribute among other unlocked sub-items
-      if (locks.duringSemester) {
-        const allRoles = Object.keys(prev.staffSalaries.duringDetails);
-        const unlockedRoles = allRoles.filter(r => r !== role && !locks[r]);
-
-        if (unlockedRoles.length > 0) {
-          // Calculate current totals for unlocked roles
-          const unlockedTotal = unlockedRoles.reduce((sum, r) => {
-            return sum + (prev.staffSalaries.duringDetails[r].quantity * prev.staffSalaries.duringDetails[r].rate);
-          }, 0);
-
-          // Redistribute the diff inversely among unlocked roles
-          unlockedRoles.forEach(r => {
-            const roleTotal = prev.staffSalaries.duringDetails[r].quantity * prev.staffSalaries.duringDetails[r].rate;
-            const proportion = unlockedTotal > 0 ? roleTotal / unlockedTotal : 1 / unlockedRoles.length;
-            const adjustment = diff * proportion;
-            const newTotal = Math.max(0, roleTotal - adjustment);
-            const rate = prev.staffSalaries.duringDetails[r].rate;
-
-            newDetails[r] = {
-              ...prev.staffSalaries.duringDetails[r],
-              quantity: rate > 0 ? Math.max(0, Number((newTotal / rate).toFixed(2))) : 0
-            };
-          });
-        }
-      }
 
       // Recalculate duringSemester total from sub-items
       const newDuringSemesterTotal = Object.values(newDetails).reduce(
@@ -347,11 +310,11 @@ export const useExpenseDetails = (expenseItems, locks = {}) => {
         0
       );
 
-      // If Staff Salaries is locked but During Semester changed, adjust Before Semester
-      const duringSemesterDiff = newDuringSemesterTotal - prev.staffSalaries.duringSemester;
+      // If Staff Salaries is locked, adjust Before Semester to maintain the constraint
       let newBeforeSemester = prev.staffSalaries.beforeSemester;
 
-      if (locks.staffSalaries && !locks.beforeSemester && Math.abs(duringSemesterDiff) > 0.01) {
+      if (locks.staffSalaries && !locks.beforeSemester) {
+        const duringSemesterDiff = newDuringSemesterTotal - prev.staffSalaries.duringSemester;
         newBeforeSemester = Math.max(0, prev.staffSalaries.beforeSemester - duringSemesterDiff);
       }
 

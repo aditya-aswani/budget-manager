@@ -94,7 +94,44 @@ export const useExpenseDetails = (expenseItems, locks = {}) => {
         return;
       }
 
+      // Validation: Check if the change is possible given the locked Rent total
+      const lockedRentTotal = expenseDetails.otherExpenses.rent;
+      const otherItemsTotal = allKeys
+        .filter(k => k !== rentKey)
+        .reduce((sum, k) => sum + expenseDetails.otherExpenses.rentDetails[k], 0);
+
+      const maxPossibleForThisItem = lockedRentTotal - otherItemsTotal + currentValue;
+
+      if (value > maxPossibleForThisItem) {
+        alert(
+          '⚠️ Cannot increase ' + rentKey + ' to $' + value.toLocaleString() + '\n\n' +
+          'Rent is locked at: $' + lockedRentTotal.toLocaleString() + '\n' +
+          'Maximum possible for ' + rentKey + ': $' + Math.max(0, maxPossibleForThisItem).toLocaleString() + '\n\n' +
+          'Other unlocked items cannot be reduced enough to accommodate this change.\n\n' +
+          'To make this change:\n' +
+          '1. Unlock Rent, OR\n' +
+          '2. Reduce this value, OR\n' +
+          '3. Unlock more items to allow redistribution'
+        );
+        return;
+      }
+
+      // Validate that redistribution won't make any unlocked items negative
       const unlockedTotal = unlockedKeys.reduce((sum, k) => sum + expenseDetails.otherExpenses.rentDetails[k], 0);
+
+      if (diff > unlockedTotal) {
+        alert(
+          '⚠️ Cannot adjust ' + rentKey + ' by $' + diff.toLocaleString() + '\n\n' +
+          'Rent is locked at: $' + expenseDetails.otherExpenses.rent.toLocaleString() + '\n' +
+          'Total available in other unlocked items: $' + unlockedTotal.toLocaleString() + '\n\n' +
+          'Other unlocked items cannot be reduced enough to accommodate this change.\n\n' +
+          'To make this change:\n' +
+          '1. Unlock Rent, OR\n' +
+          '2. Reduce this value, OR\n' +
+          '3. Unlock more items to allow redistribution'
+        );
+        return;
+      }
 
       setExpenseDetails(prev => {
         const newRentDetails = { ...prev.otherExpenses.rentDetails, [rentKey]: value };
@@ -263,6 +300,47 @@ export const useExpenseDetails = (expenseItems, locks = {}) => {
 
     // If During Semester is locked, we MUST maintain its exact value
     if (locks.duringSemester) {
+      // Check if the change is possible given the locked During Semester total
+      const lockedDuringSemesterTotal = expenseDetails.staffSalaries.duringSemester;
+      const otherRolesTotal = allRoles
+        .filter(r => r !== role)
+        .reduce((sum, r) => sum + (expenseDetails.staffSalaries.duringDetails[r].quantity * expenseDetails.staffSalaries.duringDetails[r].rate), 0);
+
+      const maxPossibleForThisRole = lockedDuringSemesterTotal - otherRolesTotal + currentRoleTotal;
+
+      if (newRoleTotal > maxPossibleForThisRole) {
+        alert(
+          '⚠️ Cannot increase ' + role + ' to $' + newRoleTotal.toLocaleString() + '\n\n' +
+          'During Semester is locked at: $' + lockedDuringSemesterTotal.toLocaleString() + '\n' +
+          'Maximum possible for ' + role + ': $' + Math.max(0, maxPossibleForThisRole).toLocaleString() + '\n\n' +
+          'Other unlocked items cannot be reduced enough to accommodate this change.\n\n' +
+          'To make this change:\n' +
+          '1. Unlock During Semester, OR\n' +
+          '2. Reduce this value, OR\n' +
+          '3. Unlock more items to allow redistribution'
+        );
+        return;
+      }
+
+      // Validate that redistribution won't make any unlocked items negative
+      const unlockedTotal = unlockedRoles.reduce((sum, r) => {
+        return sum + (expenseDetails.staffSalaries.duringDetails[r].quantity * expenseDetails.staffSalaries.duringDetails[r].rate);
+      }, 0);
+
+      if (diff > unlockedTotal) {
+        alert(
+          '⚠️ Cannot adjust ' + role + ' by $' + diff.toLocaleString() + '\n\n' +
+          'During Semester is locked at: $' + lockedDuringSemesterTotal.toLocaleString() + '\n' +
+          'Total available in other unlocked items: $' + unlockedTotal.toLocaleString() + '\n\n' +
+          'Other unlocked items cannot be reduced enough to accommodate this change.\n\n' +
+          'To make this change:\n' +
+          '1. Unlock During Semester, OR\n' +
+          '2. Reduce this value, OR\n' +
+          '3. Unlock more items to allow redistribution'
+        );
+        return;
+      }
+
       // Redistribute inversely among unlocked roles to maintain locked During Semester total
       setExpenseDetails(prev => {
         const newDetails = { ...prev.staffSalaries.duringDetails, [role]: detail };
